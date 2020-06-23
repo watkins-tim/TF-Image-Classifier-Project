@@ -23,6 +23,7 @@ def is_file(parser, arg):
 def get_arguments():
     parser = argparse.ArgumentParser(description='Flower Image Classifier')
     parser.add_argument('filename', help='Enter input image filepath', metavar='Input File Path', type=lambda x: is_file(parser, x))
+    parser.add_argument('model', help='Enter the model filepath', metavar='Model File Path', type=lambda x: is_file(parser, x))
     parser.add_argument('--top_k', type=int, default=1, metavar='Number of classes to return')
     parser.add_argument('--category_names', required=False, help='Enter json file of flower classnames', metavar='Classnames File Path', type=lambda x:is_file(parser ,x))
     args = parser.parse_args()
@@ -42,18 +43,9 @@ def predict(image_path, model, top_k):
     processed_image = process_image(image)
     p = model.predict(np.expand_dims(processed_image,axis=0))
     indicies = heapq.nlargest(top_k, range(len(p[0])), p[0].__getitem__)
-    #preds = p[0][indicies]
+    preds = p[0][indicies]
     indicies = list(np.asarray(indicies) + 1)
-    return list(map(str,indicies))
-
-# Map the given class numbers to provided class names
-def get_category_names(names_file, classes):
-    with open('label_map.json', 'r') as f:
-        class_names = json.load(names_file)
-    names_list = []
-    for c in classes:
-        names_list.append(class_names[c])
-    return names_list
+    return list(map(str,indicies)), preds
 
 # Main Method
 if __name__ == '__main__':
@@ -65,14 +57,27 @@ if __name__ == '__main__':
     tf.get_logger().setLevel('ERROR')
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-
-    loaded_model =tf.keras.models.load_model('my_model_1592358325.h5',custom_objects={'KerasLayer':hub.KerasLayer})
     args = get_arguments()
-    classes = predict(args.filename.name, loaded_model, args.top_k)
-    if (args.category_names):
-        cat_names = get_category_names(args.category_names, classes)
-        print(cat_names)
-    else:
-        print(classes)
+    print(args.category_names)
 
-  
+    #load class names file if provided
+    class_names = ''
+    if (args.category_names):
+        with open(args.category_names.name, 'r') as f:
+            class_names = json.load(f)
+
+    model_path = args.model.name
+    loaded_model =tf.keras.models.load_model(model_path, custom_objects={'KerasLayer':hub.KerasLayer})
+    classes, probabilities = predict(args.filename.name, loaded_model, args.top_k)
+
+    #print class and probability for top_k values
+    for i in range(len(classes)):
+        out = ''
+        if (class_names != ''):
+            out += class_names[classes[i]]
+        else: 
+            out += classes[i]
+        out += ': '
+        out += str(probabilities[i])
+        print(out)
+    
